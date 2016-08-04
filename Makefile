@@ -11,7 +11,7 @@ temper_json: temper_json.c pcsensor.c pcsensor.h
 	$(CC) $(CFLAGS) temper_json.c pcsensor.c -o temper_json -lusb
 
 clean:
-	rm temper temper_json
+	rm -f temper temper_json
 
 install:
 	install temper /usr/local/bin
