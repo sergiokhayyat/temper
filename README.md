@@ -5,8 +5,11 @@ Uses pcsensor.c by Michitaka Ohno, Juan Carlos Perez and Robert Kavaler
 Dockerized version
 ==================
 
-    docker build -t temper .
-    docker run --rm --privileged temper
+```
+$> docker build -t temper .
+$> docker run --rm --privileged temper
+{ "date":"2016-08-04T07:26:19Z" , "temperature":27.696424 }
+```
 
 Install intructions (Debian / Ubuntu)
 =====================================
