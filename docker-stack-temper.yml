@@ -1,0 +1,108 @@
+version: '3.3'
+
+##############################################################
+#
+# elastic stack cluter example
+#
+# Recipe to spin a complete Elasticsearch cluster, with Kibana,
+# version 5.6.1, for Elasticsearch and Kibana image tags
+#
+##############################################################
+#
+# Mandatory config:
+#
+# - "vm.max_map_count": set to, at least, 262144
+#     temporary: $> sysctl -w vm.max_map_count=262144
+#     permanent: edit "/etc/sysctl.conf" and add "vm.max_map_count = 262144"
+# - memory locking: either disable it on the container or enable it in docker daemon
+#     container: env var "bootstrap.memory_lock=false"
+#     daemon: TODO
+# - VM memory: "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+#     cambiar por un maximo de 31G
+#     editar los limites de recursos del contenedor adecuadamente (o eliminarlos)
+# - ports:
+#     elasticsearch (chage in esproxy): internal port is 9200
+#     kibana: internal port is 5601
+#
+##############################################################
+
+services:
+
+    #
+    # elasticsearch
+    #
+    # Elasticsearch configured with dnsrr for auto-discovery
+    # (dnsrr prevents port forwarding; see "esproxy" service)
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html
+    #
+    elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:5.6.1
+        environment:
+            - cluster.name=elasticsearch
+            - discovery.zen.ping.unicast.hosts=elasticsearch
+            - xpack.security.enabled=false
+            - bootstrap.memory_lock=false
+            - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+        deploy:
+            replicas: 1
+            endpoint_mode: dnsrr
+        networks:
+            - elastic
+        volumes:
+            - esdata:/usr/share/elasticsearch/data
+
+    #
+    # esproxy
+    #
+    # Nginx as proxy to connect to elasticsearch
+    # It is only used to be able to forward the 9200 port,
+    # delete it if external access is not needed
+    #
+    esproxy:
+        image: 'nginx:1'
+        command: |
+          /bin/bash -c "echo '
+          server {
+            listen 9200;
+            add_header X-Frame-Options "SAMEORIGIN";
+            location / {
+               proxy_pass http://elasticsearch:9200;
+               proxy_http_version 1.1;
+               proxy_set_header Connection keep-alive;
+               proxy_set_header Upgrade $$http_upgrade;
+               proxy_set_header Host $$host;
+               proxy_set_header X-Real-IP $$remote_addr;
+               proxy_cache_bypass $$http_upgrade;
+               proxy_connect_timeout 600;
+               proxy_read_timeout 600;
+               proxy_send_timeout 600;
+               send_timeout 600;
+            }
+          }' | tee /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+        ports:
+            - "29200:9200"
+        networks:
+            - elastic
+
+    #
+    # kibana
+    #
+    # Kibana dashboard, connected to the elasticsearch service
+    # https://www.elastic.co/guide/en/kibana/current/_configuring_kibana_on_docker.html
+    #
+    kibana:
+        image: 'docker.elastic.co/kibana/kibana:5.6.1'
+        ports:
+            - "25601:5601"
+        networks:
+            - elastic
+
+# Volumes
+volumes:
+    esdata:
+
+# Networks
+networks:
+    # common network
+    elastic:
+
